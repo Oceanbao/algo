@@ -290,7 +290,7 @@ int min(int a, int b, int c) {
 }
 ```
 
-### Classic DP: Super Egg
+### Classic DP: Super Egg Drop
 
 Drop egg K from flour N, what's the worst number of tries (worst case, and at least tries) to find breakage floor F
 
@@ -331,6 +331,66 @@ def superEggDrop(K: int, N: int):
     return res
 
   return dp(K, N)
+```
+
+Redefine State Transition Equation
+
+The previous DP-array is `dp[k][n] = m` where given k eggs and n floors, the optimal drops is m.
+
+```python
+dp[k][m] = n
+
+# Current state: K eggs, at most m moves
+# 'F' can be determined for at most n floors
+
+# dp[1][7] = 7
+# one egg is given and can drop an egg at certain floor 7 times
+# can determine 'F' for a building with at most 7 floors
+# any egg dropped at floor higher than F will break
+# any egg dropped at or below floor F will not break
+# (search linearly from the first floor)
+
+int K, N;
+
+int m = 0;
+while (dp[K][m] < N)
+  m++;
+  # state transition...
+
+# dp[K][m] == N means given K eggs at most m moves, floor F can be
+# found for a building with N floors
+# No matter break or not, the equation rests on the equality:
+# total # floors = # floors upstairs + # floors downstairs + 1 (current floor)
+
+dp[K][m] = dp[K][m - 1] + dp[k - 1][m - 1] + 1
+
+# dp[k][m - 1] is #floors upstairs, k unchanged as not broken, m - 1
+# dp[k - 1][m - 1] is #floors downstairs, k - 1 as broken, m - 1
+
+# NOTE: m - 1 because m is the upper bound of the number of moves, instead of the # moves
+```
+
+```java
+int superEggDrop(int K, int N)
+  // m < N (linear search)
+  int[][] dp = new int[K + 1][N + 1];
+  // base
+  // dp[0][..] = 0
+  // dp[..][0] = 0
+  int m = 0;
+  while (dp[K][m] < N)
+    m++;
+    for (int k = 1; k <= K; k++)
+      dp[k][m] = dp[k][m - 1] + dp[k - 1][m - 1] + 1;
+
+  return m;
+
+// equivalent
+for (int m = 1; dp[K][m] < N; m++)
+  for (int k = 1; k <= K; k++)
+    dp[K][m] = dp[k][m - 1] + dp[k - 1][m - 1] + 1;
+
+// time O(KN) for two nested loop
 ```
 
 ### Longest Common Subsequence
@@ -1084,13 +1144,743 @@ public class KMP {
 
 ### House Robber problem
 
+Dynamic planning - 3 problems in the series: first is standard DP. Second includes condition of circular array. Third combines bottom-up and top-down solutions of DP with binary tree.
+
+House Robber I
+
+Planning robbery along a street. Each house has a certain amount of money stashed, only that each adjacent house have security system connected and will trigger if two adjacent houses were broken in at once.
+
+Given a list of non-negative integers repr amount of money per house, find max amount possible sans triggering alarm.
+
+```
+Input [1,2,3,1]
+Output 4
+Reason: Rob house 1 (money = 1) and then 3 (money = 3). Total = 4
+```
+
+- Again, the key to DP is defining STATE and CHOICE
+- CHOICE there are 2 upon each house: rob or not
+- Rob: definitely cannot rob adjacent one, and only start the next from the house after next
+- Not rob: can pick next house
+- Once all house visited, no more money 0 (base)
+- STATE is the house index
+
+```java
+int rob(int[] nums)
+  return dp(nums, 0)
+
+// return nums[start..] Max value can be robbed
+int dp(int[] nums, int start)
+  if (start >= nums.length)
+    return 0;
+
+  int res = Math.max(
+    // Not rob, walk to next house
+    dp(nums, start + 1)
+    // Rob, walk to one over
+    nums[start] + dp(nums, start + 2)
+  );
+
+  return res;
+
+// with memo this is top-down recursion solution
+
+// bottom-up DP array
+int rob(int[] nums)
+  int n = nums.length;
+  // dp[i] = x means rob at i-th house, the max money is x
+  // base: dp[n] = 0
+  int[] dp = new int[n + 2];
+
+  for (int i = n - 1; i >= 0; i--)
+    dp[i] = Math.max(dp[i + 1], nums[i] + dp[i + 2]);
+
+  return dp[0];
+
+
+// Futher reducing space to O(1)
+// Since state transition only relates to two recent adjacent of dp[i]
+int rob(int[] nums) {
+    int n = nums.length;
+    // record dp[i+1] and dp[i+2]
+    int dp_i_1 = 0, dp_i_2 = 0;
+    // record dp[i]
+    int dp_i = 0; 
+    for (int i = n - 1; i >= 0; i--) {
+        dp_i = Math.max(dp_i_1, nums[i] + dp_i_2);
+        dp_i_2 = dp_i_1;
+        dp_i_1 = dp_i;
+    }
+    return dp_i;
+}
+```
+
+House Robber II
+
+On top of HR-I, all houses are arranged in circle.
+
+```
+Input: [1,2,3,1]
+Output: 4
+
+Rob house-1 and then house-3 = 4
+```
+
+Idea:
+
+- First and last house cannot be robbed at once
+- Only 3 cases: 1) either both not robbed; 2) first house robbed, 3) last house robbed
+- So solution is max of the 3. In fact, no need to compare all but just 2) and 3) since they have more room to choose than 1), the money in the house is non-negative. So the optimal decision is certainly not small if we have more choice!
+
+```java
+int rob(int[] nums)
+  int n = nums.length;
+  if (n == 1) return nums[0];
+  return Math.max(
+    robRange(nums, 0, n - 2),
+    robRange(nums, 1, n - 1),
+  )
+
+int robRange(int[] nums, int start, int end)
+  int n = nums.length;
+  int dp_i_1 = 0, dp_i_2 = 0;
+  int dp_i = 0;
+  for (int i = end; i >= start; i--)
+    dp_i = Math.max(dp_i_1, nums[i] + dp_i_2);
+    dp_i_2 = dp_i_1;
+    dp_i_1 = dp_i;
+
+  return dp_i;
+```
+
+House Robber III
+
+Now houses are arranged as binary tree where alarm is triggered by robbing any two linked houses.
+
+```
+Input: [3,2,3,null,3,null,1]
+
+   3
+  / \
+ 2   3
+  \   \
+   3   1
+
+Output: 7
+
+Max money is 3 + 3 + 1 = 7
+```
+
+```java
+Map<TreeNode, Integer> memo = new HashMap<>();
+
+public int rob(TreeNode root)
+  if (root == null) return 0;
+  // Eliminating overlapping subproblem with memo
+  if (memo.containsKey(root))
+    return memo.get(root);
+  // rob, walk to house after next
+  int do_it = root.val
+    + (root.left == null ? 0 : rob(root.left.left) + rob(root.left.right))
+    + (root.right == null ? 0 : rob(root.right.right) + rob(root.right.right));
+  // not rob, walk to next house
+  int not_do = rob(root.left) + rob(root.right);
+
+  int res = Math.max(do_it, not_do);
+  memo.put(root, res);
+
+  return res;
+
+// time O(N)
+
+// a diff approach
+int rob(TreeNode root)
+  int[] res = dp(root);
+  return Math.max(res[0], res[1]);
+
+// return an array of size 2 arr
+// arr[0] means max money you get if do not rob root
+// arr[1] means max money you get if rob root
+int[] dp(TreeNode root)
+  if (root == null)
+    return new int[]{0, 0};
+  int[] left = dp(root.left);
+  int[] right = dp(root.right);
+  // rob, walk to next
+  int rob = root.val + left[0] + right[0];
+  // not rob, next home can be robbed or not, depending on size of income
+  int not_rob = Math.max(left[0], left[1])
+              + Math.max(right[0], right[1]);
+
+  return new int[]{not_rob, rob};
+
+// space complexity is only the space required by recursive func stack, and no
+// extra space needed for memo;
+```
+
 ### Stock Buy-Sell
+
+State machine is actually a DP array.
+
+LeetCode 188. Best Time to Buy and Sell Stock IV
+
+Given an array for which the i-th is price of given stock on day i. Design an algo to find the max profit. May complete at most k transactions. (Note, must sell stock before buy again)
+
+```
+Input: [2,4,1], k = 2
+Output: 2
+Reason: Buy on day 1 (price = 2) and sell on day 2 (price = 4), profit = 4 - 2 = 2.
+
+Input: [3,2,6,5,0,3], k = 2
+Output: 7
+Reason: Buy on day 2 (price = 2) and sell on day 3 (price = 6), profit = 6 - 2 = 4. 
+Then buy on day 5 (price = 0) and sell on day 6 (price = 3), profit = 3 - 0 = 3.
+
+First, only one transaction is performed, equivalent to k = 1.
+Second, the # deals is unlimited, equivalent to k = +INF.
+Third, only two deals, k = 2.
+The remaining two also unlimited, but additional conditions of 'freezing period' and 'handling fee'
+for the transaction are actually variants of the second problem.
+```
+
+Exhaustive Framework
+
+- how? Here is not the same as the recursive idea of previous article.
+- Recursion is actually in line with the logic. Cons is that once make a mistake, you can't easily find the cause of error. E.g. the recursive has computational redundancy, but it's not easy to find.
+- Instead think in state-transition and possible states and then to find CHOICE corresponding STATE
+
+```python
+for state1 in all values of state1:
+  for state2 in all values of state2:
+    for ...
+      dp[state1][state2][..] = best_choice(choice1, choice2, ..)
+```
+
+- I.e. 3 CHOICE - buy, sell, no-ops.
+- Constrained by states-choices mix each day. buy-sell, sell-buy, buy-sell, etc.
+- k cap means can only operate on the premise k > 0
+- First to exhaust STATE: number of days, max transactions and current holding state (i.e. state of 'rest' - 1 to hold and 0 to not hold) - 3D array to hold all 3 combo
+
+```python
+dp[i][k][0 or 1]
+0 <= i <= n - 1, 1 <= k <= K
+# (n means # days, K the max allowed transation)
+# Total of n * K * 2 states
+
+for 0 <= i < n:
+  for i <= k <= K:
+    for s in {0, 1}:
+      dp[i][k][s] = max(buy, sell, rest)
+
+# dp[3][2][1] means day-3, can do 2-transaction so far and currently holding stock
+
+# Final result is to find dp[n-1][K][0], the max K allowed on last day and max profit, all sold
+# Always translate in natural language what the STATE is
+```
+
+State Transition Framework
+
+- Once STATE exhausted, think CHOICE for each STATE, and how to update it
+- buy -> 1 {-> 1, -> rest} -> sell
+- -> 0 {-> 0, -> rest} -> buy
+
+```python
+dp[i][k][0] = max(dp[i-1][k][0], dp[i-1][k][1] + prices[i)])
+# max( choose rest, choose sell )
+
+# Don't hold stocks today, two choices:
+# 1) Either didn't hold stocks i-1 then choose rest today, so still don't hold stocks
+# 2) Either held stock i-1 but today I chose to sell, so I don't hold stocks today.
+
+dp[i][k][1] = max(dp[i-1][k][1], dp[i-1][k-1][0] - prices[i])
+# max ( choose rest, choose sell )
+
+# Today hold stocks there are two choices:
+# 1) Either held stocks i-1, and choose rest today, so still hold stocks today
+# 2) Either didn't hold stocks i-1, but today chose to buy, so today I hold stocks.
+```
+
+- If buy, subtract `prices[i]` from profit, add if sell
+- max profit of today is larger of two possible choices
+- pay attention to the limitation of k
+- when buy, k - 1, sell k - 1
+- Base case
+
+```
+dp[-1][k][0] = 0
+Because i starts at 0, i = -1 means pre-start, and profit 0
+
+dp[-1][k][1] = -INF
+Before start, impossible to hold, expressed as -INF
+
+dp[i][0][0] = 0
+Since k starts from 1, k = 0 means trading not allowed
+
+dp[i][0][1] = -INF
+Impossible to hold when trading not allowed
+```
+
+Solve the problem
+
+```
+k = 1
+
+
+dp[i][1][0] = max(dp[i-1][1][0], dp[i-1][1][1] + prices[i])
+dp[i][1][1] = max(dp[i-1][1][1], dp[i-1][0][0] - prices[i]) 
+            = max(dp[i-1][1][1], -prices[i])
+Explanation：Base case of k = 0，so dp[i-1][0][0] = 0
+
+Now we find that k is 1 and will not change, that is, 
+k has no effect on the state transition. We can further simplify it with removing all k:
+dp[i][0] = max(dp[i-1][0], dp[i-1][1] + prices[i])
+dp[i][1] = max(dp[i-1][1], -prices[i])
+```
+
+```java
+int n = prices.length;
+int[][] dp = new int[n][2];
+for (int i = 0; i < n; i++) {
+    dp[i][0] = Math.max(dp[i-1][0], dp[i-1][1] + prices[i]);
+    dp[i][1] = Math.max(dp[i-1][1], -prices[i]);
+}
+return dp[n - 1][0];
+
+// dp[i-1] is illegal when i = 0; as not processed the base case of i
+// thus
+for (int i = 0; i < n; i++) {
+    if (i - 1 == -1) {
+        dp[i][0] = 0;
+        // Explanation：
+        //   dp[i][0] 
+        // = max(dp[-1][0], dp[-1][1] + prices[i])
+        // = max(0, -infinity + prices[i]) = 0
+        dp[i][1] = -prices[i];
+        // Explanation：
+        //   dp[i][1] 
+        // = max(dp[-1][1], dp[-1][0] - prices[i])
+        // = max(-infinity, 0 - prices[i]) 
+        // = -prices[i]
+        continue;
+    }
+    dp[i][0] = Math.max(dp[i-1][0], dp[i-1][1] + prices[i]);
+    dp[i][1] = Math.max(dp[i-1][1], -prices[i]);
+}
+return dp[n - 1][0];
+
+// It's annoying to handle base this way
+// The new state is only related to an adjacent state, so instead of the
+// entire DP array, only one variable needed to store this.
+// Reducing space O(1)
+// k == 1
+int maxProfit_k_1(int[] prices) {
+    int n = prices.length;
+    // base case: dp[-1][0] = 0, dp[-1][1] = -infinity
+    int dp_i_0 = 0, dp_i_1 = Integer.MIN_VALUE;
+    for (int i = 0; i < n; i++) {
+        // dp[i][0] = max(dp[i-1][0], dp[i-1][1] + prices[i])
+        dp_i_0 = Math.max(dp_i_0, dp_i_1 + prices[i]);
+        // dp[i][1] = max(dp[i-1][1], -prices[i])
+        dp_i_1 = Math.max(dp_i_1, -prices[i]);
+    }
+    return dp_i_0;
+}
+```
+
+k = +INF
+
+Here k and k - 1 can be seen as the same.
+
+```
+dp[i][k][0] = max(dp[i-1][k][0], dp[i-1][k][1] + prices[i])
+dp[i][k][1] = max(dp[i-1][k][1], dp[i-1][k-1][0] - prices[i])
+            = max(dp[i-1][k][1], dp[i-1][k][0] - prices[i])
+
+We find that k in the array has not changed, which means that 
+we do not need to record the state of k:
+dp[i][0] = max(dp[i-1][0], dp[i-1][1] + prices[i])
+dp[i][1] = max(dp[i-1][1], dp[i-1][0] - prices[i])
+```
+
+```java
+int maxProfit_k_inf(int[] prices) {
+    int n = prices.length;
+    int dp_i_0 = 0, dp_i_1 = Integer.MIN_VALUE;
+    for (int i = 0; i < n; i++) {
+        int temp = dp_i_0;
+        dp_i_0 = Math.max(dp_i_0, dp_i_1 + prices[i]);
+        dp_i_1 = Math.max(dp_i_1, temp - prices[i]);
+    }
+    return dp_i_0;
+}
+```
+
+k = +INF with cooldown
+
+Must wait one day after each sell;
+
+```
+dp[i][0] = max(dp[i-1][0], dp[i-1][1] + prices[i])
+dp[i][1] = max(dp[i-1][1], dp[i-2][0] - prices[i])
+Explanation: When we choose to buy on day i, the state 
+of i-2 should be transferred instead of i-1.
+```
+
+```java
+int maxProfit_with_cool(int[] prices) {
+    int n = prices.length;
+    int dp_i_0 = 0, dp_i_1 = Integer.MIN_VALUE;
+    int dp_pre_0 = 0; // variable representing dp[i-2][0]
+    for (int i = 0; i < n; i++) {
+        int temp = dp_i_0;
+        dp_i_0 = Math.max(dp_i_0, dp_i_1 + prices[i]);
+        dp_i_1 = Math.max(dp_i_1, dp_pre_0 - prices[i]);
+        dp_pre_0 = temp;
+    }
+    return dp_i_0;
+}
+```
+
+k = +INF with fee
+
+```
+dp[i][0] = max(dp[i-1][0], dp[i-1][1] + prices[i])
+dp[i][1] = max(dp[i-1][1], dp[i-1][0] - prices[i] - fee)
+Explanation: That means that the price of buying stocks has risen.
+It's the same case that we substract it in the first formula, 
+which is equivalent to reducing the price of the stock sold.
+```
+
+```java
+int maxProfit_with_fee(int[] prices, int fee) {
+    int n = prices.length;
+    int dp_i_0 = 0, dp_i_1 = Integer.MIN_VALUE;
+    for (int i = 0; i < n; i++) {
+        int temp = dp_i_0;
+        dp_i_0 = Math.max(dp_i_0, dp_i_1 + prices[i]);
+        dp_i_1 = Math.max(dp_i_1, temp - prices[i] - fee);
+    }
+    return dp_i_0;
+}
+```
+
+k = 2
+
+The above conditions not much related to k.
+Either k is +INF, the state equation has nothing to do with k.
+Either k = 1, close to base k = 0, and no sense of existence in the end.
+
+This case k = 2 and k to be described later are arbitrary positive integer.
+Treatment of k is highlighted.
+
+```java
+// The original state transition equation, where there is no simplification
+dp[i][k][0] = max(dp[i-1][k][0], dp[i-1][k][1] + prices[i])
+dp[i][k][1] = max(dp[i-1][k][1], dp[i-1][k-1][0] - prices[i])
+
+int k = 2;
+int[][][] dp = new int[n][k + 1][2];
+for (int i = 0; i < n; i++)
+    if (i - 1 == -1) { /* Deal with the base case */ }
+    dp[i][k][0] = Math.max(dp[i-1][k][0], dp[i-1][k][1] + prices[i]);
+    dp[i][k][1] = Math.max(dp[i-1][k][1], dp[i-1][k-1][0] - prices[i]);
+}
+return dp[n - 1][k][0];
+
+// Why wrong?
+// Recall 'exhaustive framework' means all states
+// But k was simplified in previous problems
+// e.g. k = 1
+// Since this problem does not eliminate the effect of k, we need also
+// exhaust k:
+
+int max_k = 2;
+int[][][] dp = new int[n][max_k + 1][2];
+for (int i = 0; i < n; i++) {
+    for (int k = max_k; k >= 1; k--) {
+        if (i - 1 == -1) { /* Deal with the base case */ }
+        dp[i][k][0] = max(dp[i-1][k][0], dp[i-1][k][1] + prices[i]);
+        dp[i][k][1] = max(dp[i-1][k][1], dp[i-1][k-1][0] - prices[i]);
+    }
+}
+// Exhaust n × max_k × 2 states, correct!
+return dp[n - 1][max_k][0];
+
+// Her the value range of k is small, so can directly list all cases
+// k = 1 and 2 without loop
+dp[i][2][0] = max(dp[i-1][2][0], dp[i-1][2][1] + prices[i])
+dp[i][2][1] = max(dp[i-1][2][1], dp[i-1][1][0] - prices[i])
+dp[i][1][0] = max(dp[i-1][1][0], dp[i-1][1][1] + prices[i])
+dp[i][1][1] = max(dp[i-1][1][1], -prices[i])
+
+int maxProfit_k_2(int[] prices) {
+    int dp_i10 = 0, dp_i11 = Integer.MIN_VALUE;
+    int dp_i20 = 0, dp_i21 = Integer.MIN_VALUE;
+    for (int price : prices) {
+        dp_i20 = Math.max(dp_i20, dp_i21 + price);
+        dp_i21 = Math.max(dp_i21, dp_i10 - price);
+        dp_i10 = Math.max(dp_i10, dp_i11 + price);
+        dp_i11 = Math.max(dp_i11, -price);
+    }
+    return dp_i20;
+}
+```
+
+k = any integer
+
+No different from k = 2; BUT memory overflow can occur. It turns out that value of k passed in was large, and DP array becomes too large. What would max k be?
+A transaction means buy-sell, at least 2 days. Thus the effective k should not > n/2, else no constraint effect which is equivalent to k = +INF
+
+```java
+int maxProfit_k_any(int max_k, int[] prices) {
+    int n = prices.length;
+    if (max_k > n / 2) 
+        return maxProfit_k_inf(prices);
+
+    int[][][] dp = new int[n][max_k + 1][2];
+    for (int i = 0; i < n; i++) 
+        for (int k = max_k; k >= 1; k--) {
+            if (i - 1 == -1) { /* Deal with the base case */ }
+            dp[i][k][0] = max(dp[i-1][k][0], dp[i-1][k][1] + prices[i]);
+            dp[i][k][1] = max(dp[i-1][k][1], dp[i-1][k-1][0] - prices[i]);     
+        }
+    return dp[n - 1][max_k][0];
+}
+```
+
 
 ## Data Structure
 
 ### Binary Heap and Priority Queue
 
+```java
+// the index of the parent node
+int parent(int root) {
+    return root / 2;
+}
+// index of left child
+int left(int root) {
+    return root * 2;
+}
+// index of right child
+int right(int root) {
+    return root * 2 + 1;
+}
+```
+
+```python
+class Heap:
+  def __init__(self, comparator):
+    self.arr = []
+    self.comparator = comparator
+
+  def get_parent(self, k):
+    return (k - 1) // 2
+
+  def peek(self):
+    return self.arr[0]
+
+  def push(self. v):
+    self.arr.append(v)
+    self._heapify_up(len(self.arr) - 1)
+
+  def pop(self):
+    self.arr[0] = self.arr[-1]
+    self.arr.pop()
+    self._heapify_down(0)
+
+  def _heapify_up(self, k):
+    parent = self.get_parent(k)
+    if parent == -1:
+      return
+    if not self.comparator(self.arr[parent], self.arr[k]):
+      self.arr[parent], self.arr[k] = self.arr[k], self.arr[parent]
+      self._heapify_up(parent)
+
+  def _heapify_down(self, k):
+    if k >= len(self.arr):
+      return
+    left = 2 * k + 1
+    right = 2 * k + 2
+    index = k
+    if left < len(self.arr) and not self.comparator(self.arr[index], self.arr[left]):
+      index = left
+    if right < len(self.arr) and not self.comparator(self.arr[index], self.arr[right]):
+        index = right
+    if index != k:
+        self.arr[index], self.arr[k] = self.arr[k], self.arr[index]
+        self._heapify_down(index)
+
+  def make_heap(self, arr):
+    for _, v in enumerate(arr):
+      self.arr.append(v)
+
+    index = (len(self.arr) - 1) // 2
+    for i in range(index, -1, -1):
+      self._heapify_down(i)
+
+min_heap = Heap(lambda a, b : a < b)
+max_heap = Heap(lambda a, b : a > b)
+
+arr = [4, 3, 5, 2, 1, 6, 8, 7, 9]
+min_heap.make_heap(arr)
+max_heap.make_heap(arr)
+
+print(min_heap.peek())
+print(max_heap.peek())
+
+min_heap.push(0)
+max_heap.push(10)
+
+print(min_heap.peek())
+print(max_heap.peek())
+
+min_heap.pop()
+max_heap.pop()
+
+print(min_heap.peek())
+print(max_heap.peek())
+```
+
 ### LRU Cache
+
+Just a cache clean-up strategy.
+
+LRU algo is about DS design with given capacity and implement 2 operations. 
+
+`put(key, val)` to store key-value pair
+`get(key)` to return value by key or -1 else
+
+- Ordered: required for finding least recently used and longest unused
+- Fast Search: find key in cahce
+- Fast Delete: if cache full, delete last element
+- Fast Insert: insert to head on each visit
+
+Which DS?
+
+Hashtable is fast search but unordered; Linked-list ordered and fast insert-delete but slow search.
+Mixing the two we get hash-linked-list.
+
+- Hashtable for fast search to linked-list
+- Doubly-linked-list required, see implementation for why
+
+```java
+class Node {
+    public int key, val;
+    public Node next, prev;
+    public Node(int k, int v) {
+        this.key = k;
+        this.val = v;
+    }
+}
+
+class DoubleList {  
+    // Add x at the head, time complexity O(1)
+    public void addFirst(Node x);
+
+    // Delete node x in the linked list (x is guaranteed to exist)
+    // Given a node in a doubly linked list, time complexity O(1)
+    public void remove(Node x);
+
+    // Delete and return the last node in the linked list, time complexity O(1)
+    public Node removeLast();
+
+    // Return the length of the linked list, time complexity O(1)
+    public int size();
+}
+
+// Skipping implement detail of doubly-linked-list
+// In order to delete node, not only need to get pointer of node itself, but
+// also update the node before and after, thus need DLL for O(1)
+
+// key associated with Node(key, val)
+HashMap<Integer, Node> map;
+// Node(k1, v1) <-> Node(k2, v2)...
+DoubleList cache;
+
+/*
+int get(int key) {
+    if (key does not exist) {
+        return -1;
+    } else {        
+        bring (key, val) to the head;
+        return val;
+    }
+}
+
+void put(int key, int val) {
+    Node x = new Node(key, val);
+    if (key exists) {
+        delete the old node;
+        insert the new node x to the head;
+    } else {
+        if (cache is full) {
+            delete the last node in the linked list;
+            delete the associated value in map;
+        } 
+        insert the new node x to the head;
+        associate the new node x with key in map;
+    }
+}
+*/
+
+class LRUCache {
+    // key -> Node(key, val)
+    private HashMap<Integer, Node> map;
+    // Node(k1, v1) <-> Node(k2, v2)...
+    private DoubleList cache;
+    // Max capacity
+    private int cap;
+
+    public LRUCache(int capacity) {
+        this.cap = capacity;
+        map = new HashMap<>();
+        cache = new DoubleList();
+    }
+
+    public int get(int key) {
+        if (!map.containsKey(key))
+            return -1;
+        int val = map.get(key).val;
+        // Using put method to bring it forward to the head
+        put(key, val);
+        return val;
+    }
+
+    public void put(int key, int val) {
+        // Initialize new node x
+        Node x = new Node(key, val);
+
+        if (map.containsKey(key)) {
+            // Delete the old node, add to the head
+            cache.remove(map.get(key));
+            cache.addFirst(x);
+            // Update the corresponding record in map
+            map.put(key, x);
+        } else {
+            if (cap == cache.size()) {
+                // Delete the last node in the linked list
+                Node last = cache.removeLast();
+                map.remove(last.key);
+            }
+            // Add to the head
+            cache.addFirst(x);
+            map.put(key, x);
+        }
+    }
+}
+
+// Beware of the need to store key-value pair in LL instead of value
+if (cap == cache.size()) {
+    // Delete the last node
+    Node last = cache.removeLast();
+    map.remove(last.key);
+}
+// Deleting last node (full) also need to delete the key in map, which can only
+// get via node - if only store value in node, cannot get key, hence cannot delete key from map
+```
+
+Time O(1) for both.
 
 ### Collection of Binary Search Operations
 
