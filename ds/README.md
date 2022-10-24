@@ -679,10 +679,289 @@ class Tweet {
         this.next = null;
     }
 }
+
+// User class needs to store userId, list of followers, list of posted tweets
+// List of followees can use hash-set to avoid dup and fast search
+// list of posted tweets as LL to merge with order
+// static int timestamp = 0
+class User {
+    private int id;
+    public Set<Integer> followed;
+    // The head of the linked list of posted tweets by the user
+    public Tweet head;
+
+    public User(int userId) {
+        followed = new HashSet<>();
+        this.id = userId;
+        this.head = null;
+        // follow the user him/herself
+        follow(id);
+    }
+
+    public void follow(int userId) {
+        followed.add(userId);
+    }
+
+    public void unfollow(int userId) {
+        // a user is not allowed to unfollow him/herself
+        if (userId != this.id)
+            followed.remove(userId);
+    }
+
+    public void post(int tweetId) {
+        Tweet twt = new Tweet(tweetId, timestamp);
+        timestamp++;
+        // insert the new tweet to the head of the linked list
+        // the closer a tweet is to the head, the larger the value of time
+        twt.next = head;
+        head = twt;
+    }
+}
+
+// Impl APIs
+class Twitter {
+    private static int timestamp = 0;
+    private static class Tweet {...}
+    private static class User {...}
+
+    // we need a mapping to associate userId and User
+    private HashMap<Integer, User> userMap = new HashMap<>();
+
+    /** user posts a tweet */
+    public void postTweet(int userId, int tweetId) {
+        // instantiate an instance if userId does not exist
+        if (!userMap.containsKey(userId))
+            userMap.put(userId, new User(userId));
+        User u = userMap.get(userId);
+        u.post(tweetId);
+    }
+
+    /** follower follows the followee */
+    public void follow(int followerId, int followeeId) {
+        // instantiate if the follower does not exist
+        if(!userMap.containsKey(followerId)){
+            User u = new User(followerId);
+            userMap.put(followerId, u);
+        }
+        // instantiate if the followee does not exist
+        if(!userMap.containsKey(followeeId)){
+            User u = new User(followeeId);
+            userMap.put(followeeId, u);
+        }
+        userMap.get(followerId).follow(followeeId);
+    }
+
+    /** follower unfollows the followee, do nothing if follower does not exists */
+    public void unfollow(int followerId, int followeeId) {
+        if (userMap.containsKey(followerId)) {
+            User flwer = userMap.get(followerId);
+            flwer.unfollow(followeeId);
+        }
+    }
+
+    /** return the list of IDs of recent tweets, 
+    from the users that the current user follows (including him/herself),
+    maximum 10 tweets with updated time sorted in descending order */
+    public List<Integer> getNewsFeed(int userId) {
+        // see below as we need to understand the algorithm
+    }
+}
+```
+
+Design of the Algo
+
+- combines k-ordered linked list is implemented using Priority Queue
+- sorted by time in descending (larger timestamp means more recent)
+
+```java
+public List<Integer> getNewsFeed(int userId)
+  List<Integer> res = new ArrayList<>();
+  if (!userMap.containsKey(userId)) return res;
+  // IDs of followees
+  Set<Integer> users = userMap.get(userId).followed;
+  // auto sorted by time in descending
+  PriorityQueue<Tweet> pq = new PriorityQueue<>(users.size(), (a, b)->(b.time - a.time));
+
+  // first, insert all heads of linked list into the PQ
+  for (int id : users)
+    Tweet twt = userMap.get(id).head;
+    if (twt == null) continue;
+    pq.add(twt);
+
+  while (!pq.isEmpty())
+    // return only 10 records
+    if (res.size() == 10) break;
+    // pop the tweet with the larggest item (most recent)
+    Tweet twt = pq.pop();
+    res.add(twt.id);
+    // insert the next tweet, which will be sorted
+    if (twt.next != null)
+      pq.add(twt.next);
+
+  return res;
+```
+
+- A simple timeline function using OO pattern and algo combining k-sorted linked lists
+- User and Tweet classes with APIs
+- Not for scale - a lot more details in read and write performance of DB, limit of memory cache
+- Real apps are big and complicated engineering projects
+
+```
+Client - DNS - CND
+Load Balancer
+Web Server
+Read API - Tweet Info Service - Timeline Service - User Info Service
+Write API - Search API, Fan Out - Fan Out Service - User Graph Service - Notification Service
+Memory Cache
+SQL Read Replica - SQL Write Master-Slave - Object Store
 ```
 
 ### Reverse Part of Linked List via Recursion
 
-### Best Algo Book
+```java
+// node structure for a SLL
+public class ListNode
+  int val;
+  ListNode next;
+  ListNode(int x) { val = x; }
+```
+
+- Double loop is a base solution - first-loop find m-th, then another to reverse entries between m and n
+- Need to be careful with detail, keeping the SLL integrity
+- Recursion is more elegant
+
+```java
+ListNode reverse(ListNode head)
+  if (head.next == null) return head;
+  ListNode last = reverse(head.next);
+  head.next.next = head;
+  head.next = null;
+  return last
+
+// The key for recursion is to clarify the definition of the recursive function.
+// Here: input a node `head`, we will reverse the list starting from `head`, and return the new head node
+
+// 1 (head) -> reverse(2 -> 3 -> 4 -> 5 -> 6 -> NULL)
+// after reverse(head.next), the whole LL becomes
+// 1 (head) -> NULL <- 2 <- 3 <- 4 <- 5 <- 6 (last)
+// Per definition, reverse() -> new head node, so use `last` to mark it
+// so head.next.next = head;
+// 1 (head) <- 2 ... (change NULL pointer to current head 1)
+// head.next = null;
+// NULL <- 1 (head) <- 2 ...
+
+// Some key points: 
+// 1) Recursion needs base case
+// if (head.next == null) return head;
+// which means if only one node, after reversion, the head is still itself
+// 2) after reversion, new head is `last` and former `head` becomes last node, so ensure to point its tail to null
+// head.next = null;
+```
+
+Reverse first N nodes
+
+```
+reverse(head, 3); N = 3
+
+result:
+
+1 <- 2 <- 3
+|
+ -> 4 -> 5 -> 6 -> NULL
+
+(3 returned as new head or last)
+```
+
+```java
+ListNode successor = null;
+
+// reverse n nodes starting from head, return new head
+ListNode reverseN(ListNode head, int n)
+  if (n == 1)
+    // mark (n + 1)-th node
+    successor = head.next;
+    return head;
+  // starts from head.next
+  ListNode last = reverseN(head.next, n - 1);
+
+  head.next.next = head;
+  // link new head to successor
+  head.next = successor;
+  return last;
+
+// Base case n == 1, if only one element, then new head is itself, meanwhile ensure marking successor node
+// previously head.next = null because after reversing the whole list, head becomes the last node;
+// but now head may not be, so need to mark successor n+1 and link it to `head`
+// 1 (head) <- 2 <- 3 (last)
+// |
+// -> 4 (successor) -> ...
+```
+
+Reverse m to n node
+
+```java
+// If m == 1, it's equal to reversing the first n
+ListNode reverseBetween(ListNode head, int m, int n)
+  // base
+  if (m == 1)
+    return reverseN(head, n);
+
+  // Else: if taking index of head as 1, then need to reverse from m-th
+  // If taking head.next as index 1, then compared to head.next, the reverse section should
+  // start from (m - 1), and what about head.next.next ...
+  // Diff from iteration, this is how we think in recursive way
+  head.next = reverseBetween(head.next, m - 1, n - 1);
+  return head;
+```
 
 ### Queue-Stack and Stack-Queue
+
+Stacked-Queue
+
+```java
+// Two opposing queue, facing outwards from each other
+
+// Front            Rear
+// --------   ----------
+//         | |
+// --------   ----------
+//    s2         s1
+
+class MyQueue {
+    private Stack<Intager> s1, s2;
+
+    public MyQueue() {
+        s1 = new Stack<>();
+        s2 = new Stack<>();
+    }
+
+    /** Push element x to the back of queue. */
+    public void push(int x) {
+        s1.push(x;)
+    }
+
+    /** Removes the element from in front of queue and returns that element. */
+    public int pop() {
+      // first call peek() to ensure s2 not empty
+      peek();
+      return s2.pop();
+    }
+
+    /** Get the front element. */
+    public int peek() {
+        if (s2.isEmpty())
+          // move all s1 to s2
+          while (!s1.isEmpty())
+            s2.push(s1.pop())
+        return s2.peek()
+    }
+
+    /** Returns whether the queue is empty. */
+    public boolean empty() {
+      return s1.isEmpty() && s2.isEmpty();
+    }
+}
+```
+
+- Time O(N) worst case - push(N) then pop()
+- Time O(1) on average - for an entry it can only be moved at most once, which means that the average time complexity of each element of `peek()` is O(1)
