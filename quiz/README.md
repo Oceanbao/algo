@@ -842,10 +842,151 @@ Which data structure to pick?
 
 ## Union-Find
 
+https://labuladong.gitbook.io/algo-en/iv.-high-frequency-interview-problem/union-find-explanation
+
 ## Find Subsequence with Binary Search
 
 ## One Liner
 
 ## Find Dup and Missing
 
-## Check Palindrom Linked List
+## Check Palindrome Linked List
+
+- key to Find Palindromic strings is expanding from the middle of the edges
+
+```java
+string palindrome(string& s, int l, int r) {
+    // to prevent the indexes from getting out of range
+    while (l >= 0 && r < s.size()
+            && s[l] == s[r]) {
+        // expand to two edges
+        l--; r++;
+    }
+    // return the longest palindromic in which the middle
+    // are both s[l] and s[r]
+    return s.substr(l + 1, r - l - 1);
+}
+```
+
+- the length can be either odd or even: when odd there is only one middle pivot, even two
+- so it needs to parse the `l` and `r`
+- but to CHECK it is much easier - only need double pointer trick, and move from two edges to the middle
+
+```java
+bool isPalindrome(string s) {
+    int left = 0, right = s.length - 1;
+    while (left < right) {
+        if (s[left] != s[right])
+            return false;
+        left++; right--;
+    }
+    return true;
+}
+```
+
+Check a Palindromic Singly Linked List
+
+```
+Given a head node, check if the values are palindromic
+
+/**
+ * The definition of nodes in a singly linked list:
+ * public class ListNode {
+ *     int val;
+ *     ListNode next;
+ * }
+ */
+
+boolean isPalindrome(ListNode head);
+
+Input: 1->2->null
+Output: false
+
+Input: 1->2->2->1->null
+Output: true
+```
+
+- the two pointers won't work because cannot traverse SLL in reverse - one naive way is to store the existed linked list in a new linked list reversely, then compare whether these two are the same
+- but similar to post-order traversal in a binary tree, can traverse a linked list reversely without actual reverse
+
+```java
+void traverse(TreeNode root) {
+    // code to traverse in preorder
+    traverse(root.left);
+    // code to traverse in inorder
+    traverse(root.right);
+    // code to traverse in postorder
+}
+
+// linked list is recursive and derivation of trees ADT
+// thus LL also has pre-order traversal and post-order traversal
+void traverse(ListNode head) {
+    // code to traverse in preorder
+    traverse(head.next);
+    // code to traverse in postorder
+}
+
+// to print value of val in normal order, write code in position of pre-order traversal
+// to print val in reverse order, write code in post-order traversal
+/* print the values in a linked list reversely */
+void traverse(ListNode head) {
+    if (head == null) return;
+    traverse(head.next);
+    // code to traverse in post-order
+    print(head.val);
+}
+
+// slight change to imitate the two pointers check
+// The left pointer
+ListNode left;
+
+boolean isPalindrome(ListNode head) {
+    left = head;
+    return traverse(head);
+}
+
+boolean traverse(ListNode right) {
+    if (right == null) return true;
+    boolean res = traverse(right.next);
+    // code to traverse in postorder
+    res = res && (right.val == left.val);
+    left = left.next;
+    return res;
+}
+
+// key is about pushing the nodes into a stack and then popping them out
+// at thie time the elements are in reverse (queues and stacks in recursion)
+```
+
+Above is space O(N) either way. To reduce it.
+
+```java
+// Find node in middle by fast and slow pointers
+ListNode slow, fast;
+slow = fast = head;
+while (fast != null && fast.next != null) {
+    slow = slow.next;
+    fast = fast.next.next;
+}
+// the slow pointer now points to the middle point
+
+// If fast pointer doesn't point to null, length is odd, meaning slow pointer 
+// needs to forward one more step
+if (fast != null)
+    slow = slow.next;
+
+// Reverse the right half of LL and compare palindrome
+ListNode left = head;
+ListNode right = reverse(slow);
+
+while (right != null) {
+    if (left.val != right.val)
+        return false;
+    left = left.next;
+    right = right.next;
+}
+return true;
+```
+
+https://labuladong.gitbook.io/algo-en/iv.-high-frequency-interview-problem/check_palindromic_linkedlist
+

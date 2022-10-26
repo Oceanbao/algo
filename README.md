@@ -50,20 +50,3 @@ int oneSideMax(TreeNode* root) {
 ```
 
 - after doing binary tree traversal and learn the frameworks, then do any backtracking, DP, you will find that as long as recursion is involved, it's all a tree problem
-
-## Common Knowledge
-
-### Linux Process and Thread
-
-### Linux Shell
-
-### Cookies and Session
-
-### Cryptography
-
-### Online Practice
-
-Git - https://learngitbranching.js.org
-
-SQL - sqlzoo.net
-
